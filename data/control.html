@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Brazo Robótico</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <style>
+        body {
+            background: #0d0d0d;
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            color: white;
+            user-select: none;
+        }
+
+        h1 {
+            text-align: center;
+            margin-top: 10px;
+            font-size: 28px;
+            color: #00c8ff;
+        }
+
+        .joystick-area {
+            display: flex;
+            justify-content: space-evenly;
+            margin-top: 15px;
+        }
+
+        .joy-container {
+            width: 180px;
+            height: 180px;
+            border-radius: 50%;
+            border: 3px solid #00c8ff;
+            position: relative;
+            touch-action: none;
+        }
+
+        .joy-stick {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: rgba(0, 200, 255, 0.7);
+            position: absolute;
+            top: 60px;
+            left: 60px;
+            transition: top 0.05s, left 0.05s;
+            pointer-events: none;
+        }
+
+        .slider-box {
+            margin: 20px auto;
+            width: 80%;
+        }
+
+        .slider-box label {
+            display: block;
+            margin-bottom: 4px;
+            font-size: 18px;
+            color: #00c8ff;
+        }
+
+        input[type="range"] {
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>BRAZO ROBÓTICO</h1>
+
+    <!-- ======== JOYSTICKS ======== -->
+    <div class="joystick-area">
+
+        <!-- JOYSTICK 1: BASE + BRAZO -->
+        <div class="joy-container" id="joy1">
+            <div class="joy-stick" id="stick1"></div>
+        </div>
+
+        <!-- JOYSTICK 2: ANTEBRAZO + MUÑECA -->
+        <div class="joy-container" id="joy2">
+            <div class="joy-stick" id="stick2"></div>
+        </div>
+
+    </div>
+
+    <!-- ======== SLIDER DE VELOCIDAD ======== -->
+    <div class="slider-box">
+        <label for="speed">Velocidad</label>
+        <input type="range" id="speed" min="1" max="10" value="4">
+    </div>
+
+    <!-- ======== SLIDER DE PINZA ======== -->
+    <div class="slider-box">
+        <label for="grip">Pinza</label>
+        <input type="range" id="grip" min="0" max="180" value="90">
+    </div>
+
+    <script>
+        const ws = new WebSocket("ws://" + location.hostname + ":81/");
+        ws.onopen = () => console.log("WebSocket listo");
+
+        let angles = [90, 90, 90, 90, 90];
+        let speed = 4;
+
+        document.getElementById("speed").oninput = e => {
+            speed = parseInt(e.target.value);
+        };
+
+        document.getElementById("grip").oninput = e => {
+            let v = parseInt(e.target.value);
+            angles[4] = v;
+            ws.send("5:" + v);
+        };
+
+        // ---------------------------------------------------
+        // JOYSTICK GENERATOR (multitouch, mouse+touch)
+        // ---------------------------------------------------
+
+        function setupJoystick(containerId, stickId, servoX, servoY) {
+            const joy = document.getElementById(containerId);
+            const stick = document.getElementById(stickId);
+
+            let active = false;
+            let pointerId = null;
+
+            joy.addEventListener("pointerdown", e => {
+                active = true;
+                pointerId = e.pointerId;
+                joy.setPointerCapture(pointerId);
+            });
+
+            joy.addEventListener("pointerup", e => {
+                if (e.pointerId !== pointerId) return;
+                active = false;
+                stick.style.left = "60px";
+                stick.style.top = "60px";
+            });
+
+            joy.addEventListener("pointermove", e => {
+                if (!active || e.pointerId !== pointerId) return;
+
+                let rect = joy.getBoundingClientRect();
+                let x = e.clientX - rect.left;
+                let y = e.clientY - rect.top;
+
+                let dx = x - 90;
+                let dy = y - 90;
+
+                let dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist > 80) {
+                    dx = (dx / dist) * 80;
+                    dy = (dy / dist) * 80;
+                }
+
+                stick.style.left = (90 + dx - 30) + "px";
+                stick.style.top = (90 + dy - 30) + "px";
+
+                let nx = dx / 80;
+                let ny = dy / 80;
+
+                // INCREMENTAL CONTROL
+                if (Math.abs(nx) > 0.1 && servoX !== null) {
+                    angles[servoX - 1] += nx * speed;
+                    angles[servoX - 1] = Math.max(0, Math.min(180, angles[servoX - 1]));
+                    ws.send(servoX + ":" + Math.round(angles[servoX - 1]));
+                }
+
+                if (Math.abs(ny) > 0.1 && servoY !== null) {
+                    angles[servoY - 1] -= ny * speed;
+                    angles[servoY - 1] = Math.max(0, Math.min(180, angles[servoY - 1]));
+                    ws.send(servoY + ":" + Math.round(angles[servoY - 1]));
+                }
+            });
+        }
+
+        // JOYSTICK 1 (LEFT): Base (1) + Brazo (2)
+        setupJoystick("joy1", "stick1", 1, 2);
+
+        // JOYSTICK 2 (RIGHT): Antebrazo (3) + Muñeca (4)
+        setupJoystick("joy2", "stick2", 3, 4);
+    </script>
+
+</body>
+
+</html>

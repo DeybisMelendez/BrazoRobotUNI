@@ -72,7 +72,18 @@ void setup()
 
   server.on("/", []()
             {
-    File f = LittleFS.open("/server.html", "r");
+    File f = LittleFS.open("/control.html", "r");
+    server.streamFile(f, "text/html");
+    f.close(); });
+  server.on("/old", []()
+            {
+    File f = LittleFS.open("/old.html", "r");
+    server.streamFile(f, "text/html");
+    f.close(); });
+  server.begin();
+  server.on("/pose", []()
+            {
+    File f = LittleFS.open("/pose.html", "r");
     server.streamFile(f, "text/html");
     f.close(); });
   server.begin();

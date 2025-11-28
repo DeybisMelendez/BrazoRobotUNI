@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Calibración de Servos</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <style>
+        body {
+            background: #0d0d0d;
+            color: white;
+            font-family: Arial, sans-serif;
+            padding: 15px;
+            text-align: center;
+        }
+
+        h1 {
+            color: #00c8ff;
+        }
+
+        .servo-box {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 12px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+        }
+
+        input[type="range"] {
+            width: 80%;
+        }
+
+        input[type="number"] {
+            width: 60px;
+            font-size: 16px;
+            padding: 4px;
+            margin-left: 5px;
+        }
+
+        button {
+            padding: 10px 16px;
+            margin: 5px;
+            border: none;
+            border-radius: 8px;
+            background: #00c8ff;
+            color: black;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #00a0d6;
+        }
+
+        #poses {
+            text-align: left;
+            margin-top: 20px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>Calibración de Servos</h1>
+
+    <h3>Ajuste cada servo con precisión</h3>
+
+    <script>
+        const ws = new WebSocket("ws://" + location.hostname + ":81/");
+        ws.onopen = () => console.log("Conectado a WebSocket");
+
+        let angles = [90, 90, 90, 90, 90];
+        let poses = [];
+
+        function sendAngle(id, ang) {
+            angles[id - 1] = ang;
+            ws.send(id + ":" + ang);
+        }
+    </script>
+
+    <!-- SERVOS 1–5 -->
+    <div id="servo-container"></div>
+
+    <script>
+        const servoNames = ["Base", "Brazo", "Antebrazo", "Muñeca", "Pinza"];
+        const container = document.getElementById("servo-container");
+
+        for (let i = 1; i <= 5; i++) {
+            const box = document.createElement("div");
+            box.className = "servo-box";
+
+            box.innerHTML = `
+        <h3>Servo ${i} – ${servoNames[i - 1]}</h3>
+        <input type="range" id="s${i}" min="0" max="180" value="90">
+        <input type="number" id="n${i}" min="0" max="180" value="90">
+      `;
+
+            container.appendChild(box);
+
+            const slider = box.querySelector(`#s${i}`);
+            const number = box.querySelector(`#n${i}`);
+
+            slider.oninput = () => {
+                number.value = slider.value;
+                sendAngle(i, parseInt(slider.value));
+            };
+
+            number.oninput = () => {
+                let v = Math.max(0, Math.min(180, parseInt(number.value || 0)));
+                slider.value = v;
+                sendAngle(i, v);
+            };
+        }
+    </script>
+
+    <hr>
+
+    <!-- GUARDAR POSES -->
+    <h2>Poses guardadas</h2>
+    <button onclick="savePose()">Guardar pose actual</button>
+    <button onclick="exportPoses()">Exportar JSON</button>
+
+    <div id="poses"></div>
+
+    <script>
+        const posesDiv = document.getElementById("poses");
+
+        function savePose() {
+            const copy = [...angles];
+            poses.push(copy);
+
+            let index = poses.length - 1;
+
+            let entry = document.createElement("div");
+            entry.innerHTML = `
+        <b>Pose ${index + 1}:</b> ${copy.join(", ")}
+        <button onclick="playPose(${index})">Reproducir</button>
+      `;
+
+            posesDiv.appendChild(entry);
+        }
+
+        function playPose(i) {
+            let pose = poses[i];
+            pose.forEach((ang, idx) => {
+                ws.send((idx + 1) + ":" + ang);
+                angles[idx] = ang;
+
+                document.getElementById(`s${idx + 1}`).value = ang;
+                document.getElementById(`n${idx + 1}`).value = ang;
+            });
+        }
+
+        function exportPoses() {
+            let data = JSON.stringify(poses, null, 2);
+            alert(data);
+            console.log("Export poses:", data);
+        }
+    </script>
+
+</body>
+
+</html>
