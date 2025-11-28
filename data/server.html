@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Brazo Robótico</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <style>
+    body {
+      background: #0d0d0d;
+      margin: 0;
+      padding: 0;
+      font-family: "Arial", sans-serif;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      color: white;
+    }
+
+    h1 {
+      text-align: center;
+      margin: 15px 0 10px;
+      font-size: 26px;
+    }
+
+    .speed-box {
+      text-align: center;
+      padding: 10px;
+      margin-bottom: 8px;
+    }
+
+    .speed-box input {
+      width: 80%;
+    }
+
+    .container {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      padding: 12px;
+      box-sizing: border-box;
+    }
+
+    .btn {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 22px;
+      padding: 25px 10px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #fff;
+      backdrop-filter: blur(6px);
+      transition: 0.15s;
+      user-select: none;
+      touch-action: manipulation;
+    }
+
+    .btn:active {
+      background: rgba(0, 180, 255, 0.35);
+      border-color: rgba(0, 200, 255, 0.6);
+      transform: scale(0.97);
+    }
+
+    .section-title {
+      grid-column: span 2;
+      text-align: center;
+      margin-top: 10px;
+      margin-bottom: -5px;
+      font-size: 20px;
+      color: #00c8ff;
+      font-weight: bold;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>BRAZO ROBÓTICO</h1>
+
+  <!-- CONTROL DE VELOCIDAD -->
+  <div class="speed-box">
+    <label for="speed">Velocidad: </label><br />
+    <input type="range" id="speed" min="1" max="10" value="3" />
+    <div id="speedValue">Velocidad actual: 3</div>
+  </div>
+
+  <div class="container">
+    <div class="section-title">BASE</div>
+    <div class="btn" id="bL">◀️ Izquierda</div>
+    <div class="btn" id="bR">Derecha ▶️</div>
+
+    <div class="section-title">BRAZO</div>
+    <div class="btn" id="aU">⬆️ Subir</div>
+    <div class="btn" id="aD">⬇️ Bajar</div>
+
+    <div class="section-title">ANTEBRAZO</div>
+    <div class="btn" id="fU">⬆️ Subir</div>
+    <div class="btn" id="fD">⬇️ Bajar</div>
+
+    <div class="section-title">MUÑECA</div>
+    <div class="btn" id="mU">⬆️ Subir</div>
+    <div class="btn" id="mD">⬇️ Bajar</div>
+
+    <div class="section-title">PINZA</div>
+    <div class="btn" id="pC">🤏 Cerrar</div>
+    <div class="btn" id="pO">👐 Abrir</div>
+
+  </div>
+
+  <script>
+    var ws = new WebSocket("ws://" + location.hostname + ":81/");
+    ws.onopen = () => console.log("WS conectado");
+
+    // VALORES DE SERVO
+    let a = [90, 90, 90, 90, 90];
+    let step = 3; // cambiable por slider
+    let tm = null;
+
+    // ACTUALIZAR VELOCIDAD DESDE SLIDER
+    document.getElementById("speed").addEventListener("input", function () {
+      step = parseInt(this.value);
+      document.getElementById("speedValue").innerText =
+        "Velocidad actual: " + step;
+    });
+
+    function mv(s, d) {
+      if (tm) clearInterval(tm);
+      tm = setInterval(() => {
+        a[s - 1] += d * step;
+        if (a[s - 1] < 0) a[s - 1] = 0;
+        if (a[s - 1] > 180) a[s - 1] = 180;
+        ws.send(s + ":" + a[s - 1]);
+      }, 80);
+    }
+
+    function stop() {
+      if (tm) {
+        clearInterval(tm);
+        tm = null;
+      }
+    }
+
+    function bind(id, s, d) {
+      let b = document.getElementById(id);
+
+      // Mouse
+      b.onmousedown = () => mv(s, d);
+      b.onmouseup = stop;
+      b.onmouseleave = stop;
+
+      // Touch
+      b.ontouchstart = (e) => {
+        e.preventDefault();
+        mv(s, d);
+      };
+      b.ontouchend = stop;
+    }
+
+    // VINCULACIÓN DE BOTONES
+    bind("bL", 1, -1);
+    bind("bR", 1, +1);
+
+    bind("aU", 2, +1);
+    bind("aD", 2, -1);
+
+    bind("fU", 3, -1);
+    bind("fD", 3, +1);
+
+    bind("mU", 4, +1);
+    bind("mD", 4, -1);
+
+    bind("pC", 5, -1);
+    bind("pO", 5, +1);
+  </script>
+</body>
+
+</html>
